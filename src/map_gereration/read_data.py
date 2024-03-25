@@ -92,8 +92,8 @@ def read_data_by_type(params: Params, data: pd.DataFrame, read_type: str):
                 dst_idx = int(dst_idx) - 1  # 使其从0开始,保持全局一致
                 if is_data_empty:
                     current_data.append(
-                        [src_idx, dst_idx, tx_x, tx_y, rx_x, rx_y, aim_data])
-                    columns = f'src,dst,tx_x,tx_y,rx_x,rx_y,{read_type}'.split(
+                        [src_idx, dst_idx, tx_x, tx_y, rx_x, rx_y, distance, aim_data])
+                    columns = f'src,dst,tx_x,tx_y,rx_x,rx_y,distance,{read_type}'.split(
                         ',')
                 else:
                     current_data.append([aim_data])
@@ -123,4 +123,5 @@ def main():
     data.to_csv(os.path.join(params.result_save_dir, 'data.csv'))
 
 
-main()
+if __name__ == '__main__':
+    main()
