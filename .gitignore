@@ -7,3 +7,5 @@
 
 # 忽略 test
 test*
+
+model/

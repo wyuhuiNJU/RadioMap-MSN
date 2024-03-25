@@ -48,15 +48,15 @@ def read_position(params):
     for filename in tqdm(os.listdir(params.src_data_dir), desc='loading positions...'):
         if not filename.endswith('.p2m'):
             continue
-        node_idx = read_idx_from_filename(
+        point_idx = read_idx_from_filename(
             params, filename, 'power')  # (从 power 文件中读取)
-        if node_idx is False:
+        if point_idx is False:
             continue
 
         file_path = os.path.join(params.src_data_dir, filename)
         with open(file_path, 'r') as file:
             lines = file.readlines()
-            position_line = lines[node_idx + 3]  # +3 是取决于文件存储的方式
+            position_line = lines[point_idx + 3]  # +3 是取决于文件存储的方式
             [_, x, y, z, distance, power, _] = position_line.split(' ')
             positions.append([x, y])
 
@@ -68,19 +68,19 @@ def read_position(params):
 
 
 def read_data_by_type(params: Params, data: pd.DataFrame, read_type: str):
-    # 仿真输出文件的格式是, 以NodeA为发, 其他所有节点为收的所有数据记录在一个以A节点编号命名的文件中
+    # 仿真输出文件的格式是, 以pointA为发, 其他所有节点为收的所有数据记录在一个以A节点编号命名的文件中
     is_data_empty = data.shape[0] == 0  # 初次读取时, 需记录源/目标节点序号和位置
     current_data = []  # 当前读取类型的data
 
     for filename in tqdm(os.listdir(params.src_data_dir), desc=f'loading {read_type}'):
         if not filename.endswith('.p2m'):
             continue
-        nodeA_idx = read_idx_from_filename(params, filename, read_type)
-        if nodeA_idx is False:
+        pointA_idx = read_idx_from_filename(params, filename, read_type)
+        if pointA_idx is False:
             continue
 
         if is_data_empty:
-            src_idx = nodeA_idx
+            src_idx = pointA_idx
             position = params.positions.iloc[src_idx]
             [tx_x, tx_y] = [position['x'], position['y']]
         file_path = os.path.join(params.src_data_dir, filename)
