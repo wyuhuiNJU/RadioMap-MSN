@@ -104,8 +104,8 @@ def read_data_by_type(params: Params, data: pd.DataFrame, read_type: str):
 
 def main():
     project_base_dir = 'D:\wireless_projects'
-    project_name = 'project_170'
-    area_name = 'area2'  # 仿真软件中设定的区域名称
+    project_name = 'project_complex'
+    area_name = 'area170'  # 仿真软件中设定的区域名称
     result_save_dir = os.path.join('./data', project_name)
     os.makedirs(result_save_dir, exist_ok=True)
     params = Params(project_base_dir, project_name, area_name, result_save_dir)

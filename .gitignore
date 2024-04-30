@@ -8,4 +8,8 @@
 # 忽略 test
 test*
 
-model/
+model/*
+
+# data/**/
+
+*.csv

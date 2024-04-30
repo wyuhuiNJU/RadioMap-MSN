@@ -18,6 +18,7 @@ import os
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_absolute_error
 import seaborn
+import time
 
 
 torch.manual_seed(42)
@@ -39,9 +40,9 @@ class Params():
         self.N = self.size[0] * self.size[1]
         return
     
-    def set_data_param(self, x_data_range, y_data_range): # 注意: 两个 range 都是闭区间
-        [self.x_begin, self.x_end] = x_data_range
-        [self.y_begin, self.y_end] = y_data_range
+    def set_data_param(self, x_data_label, y_data_label): # 数据集中 X 和 Y 的标签名称
+        self.x_data_label = x_data_label
+        self.y_data_label = y_data_label
         pass
     
     def set_model_param(self, in_size, out_size, batch_size, learning_rate, epochs, scale_factor):
@@ -55,16 +56,17 @@ class Params():
 
 
 def load_data(params: Params):
-    [x_b, x_e, y_b, y_e] = [params.x_begin, params.x_end, params.y_begin, params.y_end]
     data = pd.read_csv(os.path.join('./data', params.project_name, 'data.csv'), index_col=0)
     data = data.sample(frac=1)
     print(data)
-    data_x = data.iloc[:, x_b: x_e+1] # 网络输入, 2~6列为tx_x, tx_y, rx_x, rx_y #! 考虑加上distance
-    data_y = data.iloc[:, y_b: y_e+1]
+    data_x = pd.concat([data[label] for label in params.x_data_label] ,axis=1)
+    data_y = pd.concat([data[label] for label in params.y_data_label] ,axis=1)
+
     scaler_x = StandardScaler()
     scaler_y = MinMaxScaler()
     data_x = scaler_x.fit_transform(data_x)
     data_y = scaler_y.fit_transform(data_y)
+
     data_scalered = np.hstack((data_x, data_y))
 
     train_val, test = train_test_split(data_scalered, test_size=0.1)
@@ -73,8 +75,9 @@ def load_data(params: Params):
     torch.save(scaler_x, os.path.join(params.log_save_dir, 'scaler_x.pth'))
     torch.save(scaler_y, os.path.join(params.log_save_dir, 'scaler_y.pth'))
 
-    x_dim = x_e - x_b + 1 # 输入维度数
-    y_dim = y_e - y_b + 1 # 输出维度数
+    x_dim = data_x.shape[1]
+    y_dim = data_y.shape[1]
+
     ret = dict() # 返回值
     ret['all_X'] = data_scalered[:, :x_dim] 
     ret['all_Y'] = data_scalered[:, -y_dim:]
@@ -98,22 +101,24 @@ def load_data(params: Params):
 class RegressionModel(nn.Module):
     def __init__(self, in_size, out_size, scale_factor):
         super().__init__()
+        # self.fn = nn.Identity()
+        self.fn = nn.ReLU()
         self.layers = nn.Sequential(
-            nn.Linear(in_size, 128 * scale_factor),
-            nn.ReLU(),
-            nn.Linear(128 * scale_factor, 256 * scale_factor),
-            nn.ReLU(),
-            nn.Linear(256 * scale_factor, 512 * scale_factor),
-            nn.ReLU(),
-            nn.Linear(512 * scale_factor, 1024 * scale_factor),
-            nn.ReLU(),
-            nn.Linear(1024 * scale_factor, 512 * scale_factor),
-            nn.ReLU(),
-            nn.Linear(512 * scale_factor, 256 * scale_factor),
-            nn.ReLU(),
-            nn.Linear(256 * scale_factor, 128 * scale_factor),
-            nn.ReLU(),
-            nn.Linear(128 * scale_factor, out_size)
+            nn.Linear(in_size, 1 * scale_factor),
+            self.fn,
+            nn.Linear(1 * scale_factor, 2 * scale_factor),
+            self.fn,
+            nn.Linear(2 * scale_factor, 4 * scale_factor),
+            self.fn,
+            nn.Linear(4 * scale_factor, 8 * scale_factor),
+            self.fn,
+            nn.Linear(8 * scale_factor, 4 * scale_factor),
+            self.fn,
+            nn.Linear(4 * scale_factor, 2 * scale_factor),
+            self.fn,
+            nn.Linear(2 * scale_factor, 1 * scale_factor),
+            self.fn,
+            nn.Linear(1 * scale_factor, out_size)
         )
 
     def forward(self, x):
@@ -182,8 +187,8 @@ def plot_error(data, model, mode, params: Params):
     length = len(actual)
     indexes = np.arange(length)
     plt.figure()
-    plt.plot(indexes, actual_sorted, label='Actual')
     plt.plot(indexes, prediction_sorted, label='Prediction')
+    plt.plot(indexes, actual_sorted, label='Actual')
     plt.legend()
     plt.title(f'{mode} Database: Index-Actual-Prediction')
     plt.savefig(os.path.join(params.log_save_dir, f'{mode}_indx-actual-prediction.jpg'))
@@ -239,25 +244,25 @@ def darw_heatmap(params: Params, data,  model):
 
 
 def main():
-    project_name = 'project_170'
-    model_name = 'model_1'
+    project_name = 'project_209'
+    model_name = 'model_3'
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     params = Params(device)
-    size = (17, 10)
-    params.set_project_param(project_name, model_name, log_name='log_1', size=size)
-    params.set_data_param([2, 5], [6, 6])
+    size = (19, 11)
+    params.set_project_param(project_name, model_name, log_name='log_6', size=size)
+    params.set_data_param(x_data_label=['tx_x', 'tx_y', 'rx_x', 'rx_y'], y_data_label=['power'])
     data = load_data(params)
 
     in_size = data['train_X'].shape[1]
     out_size = data['train_Y'].shape[1]
     print(data['train_Y'].shape)
-    batch_size = 128
+    depth = 7
+    batch_size = 1024
     learning_rate = 1e-5
-    epochs = 100
-    scale_factor = 2
+    epochs = 200
+    scale_factor = 256 * 4
     params.set_model_param(in_size, out_size, batch_size, learning_rate, epochs, scale_factor)
-
 
     model = RegressionModel(in_size, out_size, scale_factor)
     model.to(device)
@@ -270,17 +275,21 @@ def main():
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
+    times = []
     train_losses, val_losses = [], [] # 记录 loss 以绘制曲线
     for epoch  in range(epochs):
+        begin_time = time.time()
         train_loss = train(model, train_loader, criterion, optimizer, params)
         val_loss = evaluate(model, val_loader, criterion, params)
         
         train_losses.append(train_loss)
         val_losses.append(val_loss)
+        end_time = time.time()
+        times.append(end_time - begin_time)
 
         print(f'Epoch {epoch + 1}/{epochs} - Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}')
 
-    torch.save(model.state_dict(), os.path.join(params.log_save_dir, 'model.keras'))
+    torch.save(model, os.path.join(params.log_save_dir, 'model.pth'))
     print(f'Model saved at {params.log_save_dir}')
     plot_history(train_losses, val_losses, params)
     plot_error(data, model, 'train', params)
@@ -288,9 +297,14 @@ def main():
     print('测试集:------>', end='')
     plot_error(data, model, 'test', params)
     plot_error(data, model, 'all', params)
-    darw_heatmap(params, data, model)
+    # darw_heatmap(params, data, model)
+    # val_loss, 耗时, 
+    epoch_history = pd.concat((pd.DataFrame(val_losses), pd.DataFrame(times)), axis=1)
+    epoch_history.to_csv(os.path.join(params.log_save_dir, f'batchSize={batch_size}_scaler={scale_factor}_depth={depth}.csv'), header=['loss', 'time'])
+    print(f'batchSize={batch_size}_scaler={scale_factor}_depth={depth}.csv')
 
     
 
 if __name__ == '__main__':
     main()
+
